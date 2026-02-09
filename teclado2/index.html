@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虚拟键盘</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4361ee',
+                        secondary: '#3f37c9',
+                        accent: '#4895ef',
+                        dark: '#1d3557',
+                        light: '#f8f9fa'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .key-btn {
+            transition: all 0.2s ease;
+            user-select: none;
+            border-radius: 8px;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+        .key-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .key-btn:hover::after {
+            opacity: 1;
+        }
+        .key-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .key-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .keyboard-container {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+            border-radius: 16px;
+            background: white;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .text-display {
+            min-height: 160px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            line-height: 1.6;
+            padding: 1.25rem;
+            font-size: 1.125rem;
+            background: #f9fafb;
+            border: 2px dashed #e5e7eb;
+            outline: none;
+            resize: none;
+        }
+        .function-key {
+            background: #e9ecef;
+            color: #495057;
+            font-weight: 600;
+        }
+        .special-key {
+            background: #6c757d;
+            color: white;
+        }
+        .space-key {
+            background: #ced4da;
+        }
+        .active-shift, .active-caps {
+            background: #4361ee !important;
+            color: white !important;
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.3);
+        }
+        .arrow-key {
+            background: #4cc9f0;
+            color: white;
+            font-weight: 700;
+            min-height: 56px;
+        }
+        .next-key {
+            background: #7209b7;
+            color: white;
+            font-weight: 700;
+        }
+        .keyboard-row {
+            margin-bottom: 8px;
+        }
+        .keyboard-row:last-child {
+            margin-bottom: 0;
+        }
+        .control-section {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+        .instructions-card {
+            background: linear-gradient(135deg, #f0f4f8 0%, #e6e9ef 100%);
+            border-left: 4px solid #4361ee;
+        }
+        @media (max-width: 768px) {
+            .keyboard-container {
+                padding: 12px;
+            }
+            .key-btn {
+                padding: 8px 4px;
+                font-size: 0.85rem;
+            }
+            .control-section {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+            }
+            .arrow-key, .next-key {
+                min-height: 48px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-4xl">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2 flex items-center justify-center">
+                <i class="fas fa-keyboard text-primary mr-3 text-4xl"></i>
+                虚拟键盘
+            </h1>
+            <p class="text-gray-600 text-lg">点击键盘按键或使用物理键盘输入文本</p>
+        </div>
+
+        <!-- 文本显示区域 -->
+        <div class="bg-white rounded-xl p-6 mb-8 keyboard-container">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+                <h2 class="text-xl font-semibold text-gray-700 flex items-center">
+                    <i class="fas fa-edit mr-2 text-primary"></i>
+                    文本输入区
+                </h2>
+                <div class="flex flex-wrap gap-2">
+                    <button id="clearBtn" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition flex items-center">
+                        <i class="fas fa-trash mr-2"></i>清空
+                    </button>
+                    <button id="copyBtn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center">
+                        <i class="fas fa-copy mr-2"></i>复制
+                    </button>
+                </div>
+            </div>
+            <textarea id="textDisplay" class="text-display w-full focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="点击此处或使用虚拟键盘开始输入..."></textarea>
+        </div>
+
+        <!-- 虚拟键盘 -->
+        <div class="bg-white rounded-xl p-6 keyboard-container">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-xl font-semibold text-gray-700 flex items-center">
+                    <i class="fas fa-keyboard mr-2 text-secondary"></i>
+                    虚拟键盘
+                </h2>
+                <div class="flex items-center bg-gray-100 rounded-full px-3 py-1 text-sm">
+                    <span class="mr-2">输入模式:</span>
+                    <div class="flex items-center">
+                        <span class="mr-1">英文</span>
+                        <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" id="languageToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" />
+                            <label for="languageToggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                        </div>
+                        <span class="ml-1">中文</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="virtualKeyboard" class="space-y-2"></div>
+            
+            <!-- 控制按钮区域 - 包含方向键和下一个按钮 -->
+            <div class="control-section">
+                <button class="key-btn arrow-key" data-action="arrow" data-value="ArrowLeft">
+                    <i class="fas fa-arrow-left"></i><br>左
+                </button>
+                <button class="key-btn arrow-key" data-action="arrow" data-value="ArrowRight">
+                    <i class="fas fa-arrow-right"></i><br>右
+                </button>
+                <button class="key-btn arrow-key" data-action="arrow" data-value="ArrowUp">
+                    <i class="fas fa-arrow-up"></i><br>上
+                </button>
+                <button class="key-btn arrow-key" data-action="arrow" data-value="ArrowDown">
+                    <i class="fas fa-arrow-down"></i><br>下
+                </button>
+                <button class="key-btn next-key" data-action="next">
+                    <i class="fas fa-step-forward"></i><br>下一个
+                </button>
+            </div>
+        </div>
+
+        <!-- 功能说明 -->
+        <div class="mt-8 bg-white rounded-xl p-6 keyboard-container instructions-card">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                <i class="fas fa-info-circle mr-2 text-primary"></i>
+                使用说明
+            </h3>
+            <ul class="list-disc pl-5 text-gray-700 space-y-2 text-base">
+                <li>点击虚拟键盘上的按键输入文本</li>
+                <li>支持物理键盘输入（焦点在文本区时）</li>
+                <li>使用退格键删除字符，清空按钮清除全部文本</li>
+                <li>支持大小写切换功能（点击"大写"键）</li>
+                <li>方向键可在文本中移动光标位置</li>
+                <li>"下一个"按钮可快速跳至下一行</li>
+                <li>切换中英文模式可输入不同语言内容</li>
+            </ul>
+        </div>
+        
+        <div class="mt-6 text-center text-sm text-gray-500">
+            <p>虚拟键盘 &copy; 2026 | 专为中文用户设计</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM元素
+            const textDisplay = document.getElementById('textDisplay');
+            const clearBtn = document.getElementById('clearBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const virtualKeyboard = document.getElementById('virtualKeyboard');
+            const languageToggle = document.getElementById('languageToggle');
+            
+            // 状态变量
+            let isShiftActive = false;
+            let isCapsActive = false;
+            let isChineseMode = false;
+            
+            // 键盘布局配置
+            const keyboardLayout = [
+                // 第一行
+                [
+                    { value: '`', shift: '~', label: '` ~' },
+                    { value: '1', shift: '!', label: '1 !' },
+                    { value: '2', shift: '@', label: '2 @' },
+                    { value: '3', shift: '#', label: '3 #' },
+                    { value: '4', shift: '$', label: '4 $' },
+                    { value: '5', shift: '%', label: '5 %' },
+                    { value: '6', shift: '^', label: '6 ^' },
+                    { value: '7', shift: '&', label: '7 &' },
+                    { value: '8', shift: '*', label: '8 *' },
+                    { value: '9', shift: '(', label: '9 (' },
+                    { value: '0', shift: ')', label: '0 )' },
+                    { value: '-', shift: '_', label: '- _' },
+                    { value: '=', shift: '+', label: '= +' },
+                    { value: 'Backspace', type: 'function', label: '退格', span: 'col-span-2' }
+                ],
+                // 第二行
+                [
+                    { value: 'Tab', type: 'function', label: '切换', span: 'col-span-2' },
+                    { value: 'q', shift: 'Q' },
+                    { value: 'w', shift: 'W' },
+                    { value: 'e', shift: 'E' },
+                    { value: 'r', shift: 'R' },
+                    { value: 't', shift: 'T' },
+                    { value: 'y', shift: 'Y' },
+                    { value: 'u', shift: 'U' },
+                    { value: 'i', shift: 'I' },
+                    { value: 'o', shift: 'O' },
+                    { value: 'p', shift: 'P' },
+                    { value: '[', shift: '{', label: '[ {' },
+                    { value: ']', shift: '}', label: '] }' },
+                    { value: '\\', shift: '|', label: '\\ |', span: 'col-span-1' }
+                ],
+                // 第三行
+                [
+                    { value: 'CapsLock', type: 'function', label: '大写', span: 'col-span-2' },
+                    { value: 'a', shift: 'A' },
+                    { value: 's', shift: 'S' },
+                    { value: 'd', shift: 'D' },
+                    { value: 'f', shift: 'F' },
+                    { value: 'g', shift: 'G' },
+                    { value: 'h', shift: 'H' },
+                    { value: 'j', shift: 'J' },
+                    { value: 'k', shift: 'K' },
+                    { value: 'l', shift: 'L' },
+                    { value: ';', shift: ':', label: '; :' },
+                    { value: "'", shift: '"', label: '\' "' },
+                    { value: 'Enter', type: 'function', label: '回车', span: 'col-span-2' }
+                ],
+                // 第四行
+                [
+                    { value: 'Shift', type: 'function', label: '上档', span: 'col-span-3' },
+                    { value: 'z', shift: 'Z' },
+                    { value: 'x', shift: 'X' },
+                    { value: 'c', shift: 'C' },
+                    { value: 'v', shift: 'V' },
+                    { value: 'b', shift: 'B' },
+                    { value: 'n', shift: 'N' },
+                    { value: 'm', shift: 'M' },
+                    { value: ',', shift: '<', label: ', <' },
+                    { value: '.', shift: '>', label: '. >' },
+                    { value: '/', shift: '?', label: '/ ?' },
+                    { value: 'Shift', type: 'function', label: '上档', span: 'col-span-2' }
+                ],
+                // 第五行
+                [
+                    { value: 'Control', type: 'function', label: 'Ctrl', span: 'col-span-2' },
+                    { value: 'Alt', type: 'function', label: 'Alt', span: 'col-span-2' },
+                    { value: ' ', type: 'space', label: '空格', span: 'col-span-4' },
+                    { value: 'Alt', type: 'function', label: 'Alt', span: 'col-span-2' },
+                    { value: 'Control', type: 'function', label: 'Ctrl', span: 'col-span-2' }
+                ]
+            ];
+            
+            // 中文键盘布局（简化版）
+            const chineseKeyboardLayout = [
+                // 第一行
+                [
+                    { value: '！', label: '！' },
+                    { value: '？', label: '？' },
+                    { value: '。', label: '。' },
+                    { value: '，', label: '，' },
+                    { value: '、', label: '、' },
+                    { value: '；', label: '；' },
+                    { value: '：', label: '：' },
+                    { value: '「', label: '「' },
+                    { value: '」', label: '」' },
+                    { value: '（', label: '（' },
+                    { value: '）', label: '）' },
+                    { value: '-', label: '-' },
+                    { value: '_', label: '_' },
+                    { value: 'Backspace', type: 'function', label: '退格', span: 'col-span-2' }
+                ],
+                // 第二行
+                [
+                    { value: 'Tab', type: 'function', label: '切换', span: 'col-span-2' },
+                    { value: '的', label: '的' },
+                    { value: '一', label: '一' },
+                    { value: '是', label: '是' },
+                    { value: '了', label: '了' },
+                    { value: '我', label: '我' },
+                    { value: '你', label: '你' },
+                    { value: '他', label: '他' },
+                    { value: '她', label: '她' },
+                    { value: '在', label: '在' },
+                    { value: '有', label: '有' },
+                    { value: '这', label: '这' },
+                    { value: '那', label: '那' },
+                    { value: '们', label: '们', span: 'col-span-1' }
+                ],
+                // 第三行
+                [
+                    { value: 'CapsLock', type: 'function', label: '符号', span: 'col-span-2' },
+                    { value: '来', label: '来' },
+                    { value: '去', label: '去' },
+                    { value: '不', label: '不' },
+                    { value: '和', label: '和' },
+                    { value: '与', label: '与' },
+                    { value: '就', label: '就' },
+                    { value: '可', label: '可' },
+                    { value: '以', label: '以' },
+                    { value: '得', label: '得' },
+                    { value: '也', label: '也' },
+                    { value: '很', label: '很' },
+                    { value: 'Enter', type: 'function', label: '回车', span: 'col-span-2' }
+                ],
+                // 第四行
+                [
+                    { value: 'Shift', type: 'function', label: '上档', span: 'col-span-3' },
+                    { value: '中', label: '中' },
+                    { value: '国', label: '国' },
+                    { value: '人', label: '人' },
+                    { value: '民', label: '民' },
+                    { value: '大', label: '大' },
+                    { value: '学', label: '学' },
+                    { value: '生', label: '生' },
+                    { value: '工', label: '工' },
+                    { value: '作', label: '作' },
+                    { value: '时', label: '时' },
+                    { value: '间', label: '间', span: 'col-span-2' }
+                ],
+                // 第五行
+                [
+                    { value: 'Control', type: 'function', label: 'Ctrl', span: 'col-span-2' },
+                    { value: 'Alt', type: 'function', label: 'Alt', span: 'col-span-2' },
+                    { value: ' ', type: 'space', label: '空格', span: 'col-span-4' },
+                    { value: 'Alt', type: 'function', label: 'Alt', span: 'col-span-2' },
+                    { value: 'Control', type: 'function', label: 'Ctrl', span: 'col-span-2' }
+                ]
+            ];
+            
+            // 渲染键盘
+            function renderKeyboard() {
+                virtualKeyboard.innerHTML = '';
+                
+                const layout = isChineseMode ? chineseKeyboardLayout : keyboardLayout;
+                
+                layout.forEach((row, rowIndex) => {
+                    const rowDiv = document.createElement('div');
+                    rowDiv.className = 'keyboard-row grid grid-cols-12 gap-1.5';
+                    
+                    row.forEach((key, keyIndex) => {
+                        const keyBtn = document.createElement('button');
+                        keyBtn.className = 'key-btn p-2.5 text-base font-medium bg-white border border-gray-200 shadow-sm hover:bg-gray-50 active:bg-gray-100';
+                        
+                        // 设置列跨度
+                        if (key.span) {
+                            keyBtn.classList.add(key.span);
+                        }
+                        
+                        // 设置按键类型样式
+                        if (key.type === 'function') {
+                            keyBtn.classList.add('function-key');
+                        } else if (key.type === 'space') {
+                            keyBtn.classList.add('space-key');
+                            keyBtn.innerHTML = '<span class="text-gray-500">空格</span>';
+                        } else if (key.value === 'Backspace' || key.value === 'Enter') {
+                            keyBtn.classList.add('special-key');
+                        }
+                        
+                        // 设置按键文本
+                        if (key.type !== 'space') {
+                            if (key.label) {
+                                keyBtn.textContent = key.label;
+                            } else if (isShiftActive && key.shift) {
+                                keyBtn.textContent = key.shift;
+                            } else {
+                                keyBtn.textContent = key.value;
+                            }
+                        }
+                        
+                        // 设置特殊按键的data属性
+                        if (key.type === 'function') {
+                            keyBtn.dataset.action = key.value;
+                        } else if (key.type !== 'space') {
+                            keyBtn.dataset.value = key.value;
+                            if (key.shift) keyBtn.dataset.shiftValue = key.shift;
+                        }
+                        
+                        // 高亮活动状态
+                        if ((key.value === 'Shift' && isShiftActive) || 
+                            (key.value === 'CapsLock' && isCapsActive)) {
+                            keyBtn.classList.add('active-shift');
+                        }
+                        
+                        rowDiv.appendChild(keyBtn);
+                    });
+                    
+                    virtualKeyboard.appendChild(rowDiv);
+                });
+                
+                // 添加事件监听
+                document.querySelectorAll('.key-btn').forEach(button => {
+                    button.addEventListener('click', handleKeyPress);
+                });
+            }
+            
+            // 处理按键事件
+            function handleKeyPress(e) {
+                const button = e.target;
+                const action = button.dataset.action;
+                const value = button.dataset.value;
+                const shiftValue = button.dataset.shiftValue;
+                
+                // 处理功能键
+                if (action) {
+                    switch(action) {
+                        case 'Backspace':
+                            handleBackspace();
+                            break;
+                        case 'Enter':
+                            insertText('\n');
+                            break;
+                        case 'Space':
+                            insertText(' ');
+                            break;
+                        case 'Tab':
+                            insertText('\t');
+                            break;
+                        case 'Shift':
+                            toggleShift();
+                            break;
+                        case 'CapsLock':
+                            toggleCapsLock();
+                            break;
+                        case 'Control':
+                        case 'Alt':
+                            // 这些键在虚拟键盘中通常不单独使用
+                            break;
+                    }
+                    return;
+                }
+                
+                // 处理普通字符键
+                if (value) {
+                    let charToInsert = isShiftActive && shiftValue ? shiftValue : value;
+                    
+                    // 如果是大写锁定状态且是字母
+                    if (isCapsActive && /[a-z]/.test(charToInsert)) {
+                        charToInsert = isShiftActive ? charToInsert.toLowerCase() : charToInsert.toUpperCase();
+                    }
+                    
+                    insertText(charToInsert);
+                    
+                    // 如果是Shift键且不是CapsLock，输入后取消Shift状态
+                    if (isShiftActive && !isCapsActive) {
+                        isShiftActive = false;
+                        renderKeyboard();
+                    }
+                }
+            }
+            
+            // 处理方向键和特殊按钮
+            document.querySelectorAll('[data-action="arrow"]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const direction = e.target.dataset.value;
+                    moveCursor(direction);
+                });
+            });
+            
+            document.querySelector('[data-action="next"]').addEventListener('click', () => {
+                insertText('\n');
+                // 自动滚动到底部
+                setTimeout(() => {
+                    textDisplay.scrollTop = textDisplay.scrollHeight;
+                }, 10);
+            });
+            
+            // 移动光标
+            function moveCursor(direction) {
+                const textarea = textDisplay;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const value = textarea.value;
+                
+                switch(direction) {
+                    case 'ArrowLeft':
+                        if (start > 0) {
+                            textarea.selectionStart = textarea.selectionEnd = start - 1;
+                        }
+                        break;
+                    case 'ArrowRight':
+                        if (end < value.length) {
+                            textarea.selectionStart = textarea.selectionEnd = end + 1;
+                        }
+                        break;
+                    case 'ArrowUp':
+                        // 简单实现：移动到上一行相同位置
+                        const lines = value.split('\n');
+                        let pos = 0;
+                        let lineIndex = 0;
+                        let charIndex = 0;
+                        
+                        for (let i = 0; i < lines.length; i++) {
+                            if (pos + lines[i].length >= start) {
+                                lineIndex = i;
+                                charIndex = start - pos;
+                                break;
+                            }
+                            pos += lines[i].length + 1; // +1 for newline
+                        }
+                        
+                        if (lineIndex > 0) {
+                            const newPos = pos - lines[lineIndex-1].length - 1 + Math.min(charIndex, lines[lineIndex-1].length);
+                            textarea.selectionStart = textarea.selectionEnd = newPos;
+                        } else if (start > 0) {
+                            textarea.selectionStart = textarea.selectionEnd = 0;
+                        }
+                        break;
+                    case 'ArrowDown':
+                        // 简单实现：移动到下一行相同位置
+                        const linesDown = value.split('\n');
+                        let posDown = 0;
+                        let lineIndexDown = 0;
+                        let charIndexDown = 0;
+                        
+                        for (let i = 0; i < linesDown.length; i++) {
+                            if (posDown + linesDown[i].length >= start) {
+                                lineIndexDown = i;
+                                charIndexDown = start - posDown;
+                                break;
+                            }
+                            posDown += linesDown[i].length + 1; // +1 for newline
+                        }
+                        
+                        if (lineIndexDown < linesDown.length - 1) {
+                            const nextLineStart = posDown + linesDown[lineIndexDown].length + 1;
+                            const newPos = nextLineStart + Math.min(charIndexDown, linesDown[lineIndexDown+1].length);
+                            textarea.selectionStart = textarea.selectionEnd = newPos;
+                        } else if (end < value.length) {
+                            textarea.selectionStart = textarea.selectionEnd = value.length;
+                        }
+                        break;
+                }
+                
+                textarea.focus();
+            }
+            
+            // 插入文本到光标位置
+            function insertText(text) {
+                const textarea = textDisplay;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const value = textarea.value;
+                
+                textarea.value = value.slice(0, start) + text + value.slice(end);
+                
+                // 设置新光标位置
+                textarea.selectionStart = textarea.selectionEnd = start + text.length;
+                textarea.focus();
+                
+                // 如果是回车，自动滚动到底部
+                if (text === '\n') {
+                    setTimeout(() => {
+                        textarea.scrollTop = textarea.scrollHeight;
+                    }, 10);
+                }
+            }
+            
+            // 处理退格键
+            function handleBackspace() {
+                const textarea = textDisplay;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const value = textarea.value;
+                
+                if (start === end && start > 0) {
+                    // 没有选中文本，删除前一个字符
+                    textarea.value = value.slice(0, start - 1) + value.slice(end);
+                    textarea.selectionStart = textarea.selectionEnd = start - 1;
+                } else if (start !== end) {
+                    // 有选中文本，删除选中部分
+                    textarea.value = value.slice(0, start) + value.slice(end);
+                    textarea.selectionStart = textarea.selectionEnd = start;
+                }
+                
+                textarea.focus();
+            }
+            
+            // 切换Shift状态
+            function toggleShift() {
+                isShiftActive = !isShiftActive;
+                renderKeyboard();
+            }
+            
+            // 切换CapsLock状态
+            function toggleCapsLock() {
+                isCapsActive = !isCapsActive;
+                renderKeyboard();
+            }
+            
+            // 处理物理键盘事件
+            textDisplay.addEventListener('keydown', (e) => {
+                // 同步物理键盘的Shift和CapsLock状态到虚拟键盘
+                if (e.key === 'Shift') {
+                    isShiftActive = e.shiftKey;
+                } else if (e.key === 'CapsLock') {
+                    isCapsActive = !isCapsActive;
+                } else if (e.key === 'Backspace') {
+                    // 阻止默认行为，使用我们的处理
+                    e.preventDefault();
+                    handleBackspace();
+                    return;
+                }
+                
+                // 更新虚拟键盘显示
+                renderKeyboard();
+            });
+            
+            textDisplay.addEventListener('keyup', (e) => {
+                if (e.key === 'Shift') {
+                    // 如果不是CapsLock模式，释放Shift键时取消高亮
+                    if (!isCapsActive) {
+                        isShiftActive = false;
+                    }
+                    renderKeyboard();
+                }
+            });
+            
+            // 清空按钮
+            clearBtn.addEventListener('click', () => {
+                textDisplay.value = '';
+                textDisplay.focus();
+            });
+            
+            // 复制按钮
+            copyBtn.addEventListener('click', () => {
+                textDisplay.select();
+                document.execCommand('copy');
+                
+                // 显示复制成功提示
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i class="fas fa-check mr-2"></i>已复制!';
+                copyBtn.disabled = true;
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.disabled = false;
+                }, 1500);
+            });
+            
+            // 语言切换
+            languageToggle.addEventListener('change', () => {
+                isChineseMode = languageToggle.checked;
+                isShiftActive = false;
+                isCapsActive = false;
+                renderKeyboard();
+            });
+            
+            // 初始化键盘
+            renderKeyboard();
+            
+            // 设置文本区域焦点
+            textDisplay.focus();
+            
+            // 添加点击外部区域关闭键盘高亮
+            document.addEventListener('click', (e) => {
+                if (!virtualKeyboard.contains(e.target) && !textDisplay.contains(e.target)) {
+                    // 重置Shift状态（如果不是CapsLock模式）
+                    if (!isCapsActive) {
+                        isShiftActive = false;
+                        renderKeyboard();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
